@@ -16,6 +16,7 @@ echo [3] List current configuration
 echo [4] Restart Nginx
 echo [5] Start/Stop Nginx
 echo [6] Manage Addresses
+echo [7] Initial Setup
 echo [0] Quit
 echo ===============================
 set /p choice="Enter choice: "
@@ -26,6 +27,7 @@ if "%choice%"=="3" goto list_configuration
 if "%choice%"=="4" goto restart_nginx
 if "%choice%"=="5" goto start_stop_nginx
 if "%choice%"=="6" goto manage_addresses
+if "%choice%"=="7" goto initial_setup
 if "%choice%"=="0" goto quit
 echo Invalid choice, please try again.
 pause
@@ -44,6 +46,16 @@ if errorlevel 1 (
     echo Failed to add forwarding rule.
 ) else (
     echo Forwarding rule added successfully!
+    echo Would you like to create a firewall rule for port %public_port%? (Y/N)
+    set /p add_fw_rule="Enter choice: "
+    if /i "%add_fw_rule%"=="Y" (
+        netsh advfirewall firewall add rule name="[Nginx-Manager] Port %public_port%" dir=in action=allow protocol=TCP localport=%public_port%
+        if errorlevel 1 (
+            echo Failed to create firewall rule.
+        ) else (
+            echo Firewall rule for port %public_port% created successfully!
+        )
+    )
 )
 pause
 goto menu
@@ -59,6 +71,16 @@ if errorlevel 1 (
     echo Failed to remove forwarding rule.
 ) else (
     echo Forwarding rule removed successfully!
+    echo Would you like to remove the firewall rule for port %public_port%? (Y/N)
+    set /p remove_fw_rule="Enter choice: "
+    if /i "%remove_fw_rule%"=="Y" (
+        netsh advfirewall firewall delete rule name="[Nginx-Manager] Port %public_port%"
+        if errorlevel 1 (
+            echo Failed to remove firewall rule.
+        ) else (
+            echo Firewall rule for port %public_port% removed successfully!
+        )
+    )
 )
 pause
 goto menu
@@ -131,7 +153,7 @@ echo ===============================
 echo Explanation:
 echo This menu is used to set the public IP of this VPS and the private IP of
 echo the bare-metal or forwarded host. These values are used by the "netsh"
-echo command to configure port forwarding on Windows Server.
+echo command to configure port forwarding on Windows Server 2022.
 echo The "netsh interface portproxy" command allows the redirection of traffic
 echo from one IP/port pair to another, enabling services to be forwarded to
 echo internal hosts or other services on the network.
@@ -170,6 +192,39 @@ set private_ip=%new_private_ip%
 echo Private IP updated to %private_ip%.
 pause
 goto manage_addresses
+
+:initial_setup
+cls
+echo ===============================
+echo Initial Setup
+echo ===============================
+echo Explanation:
+echo This menu runs essential configuration commands for this server.
+echo The "Set-ItemProperty" command is used to enable IP routing by
+echo modifying the Windows registry key "IPEnableRouter" in Windows
+echo Server 2022.
+echo ===============================
+echo [1] Enable IP Routing
+echo [0] Back to Main Menu
+echo ===============================
+set /p setup_choice="Enter choice: "
+if "%setup_choice%"=="1" goto enable_ip_routing
+if "%setup_choice%"=="0" goto menu
+echo Invalid choice, please try again.
+pause
+goto initial_setup
+
+:enable_ip_routing
+cls
+echo Enabling IP Routing...
+powershell -Command "Set-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters' -Name 'IPEnableRouter' -Value 1"
+if errorlevel 1 (
+    echo Failed to enable IP routing. Please check permissions.
+) else (
+    echo IP routing enabled successfully!
+)
+pause
+goto initial_setup
 
 :quit
 echo Exiting Port Forwarding and Nginx Manager...
